@@ -1,0 +1,20 @@
+﻿# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editor / IDE
+.vscode/
+.idea/
+*.swp
+
+# Logs
+*.log
+
+# Node (only if you later add tooling; not required for this build-free project)
+node_modules/
+npm-debug.log*
+
+# Original unprocessed source image (the game uses assets/block.jpg instead)
+# Remove this line if you want to track the original photo.
+WhatsApp Image*.jpeg
