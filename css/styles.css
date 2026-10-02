@@ -68,8 +68,10 @@ h1,
   letter-spacing: 0.08em;
 }
 
-/* The main play area: board next to the side panel on wide screens, stacked
- * on narrow ones. flex-wrap keeps everything inside the viewport at 320px. */
+/* The main play area: board next to the side panel. The real container in the
+ * markup is .game__layout (the .playarea/.layout aliases are kept for
+ * robustness). flex-wrap keeps everything inside the viewport at 320px. */
+.game__layout,
 .playarea,
 .layout {
   display: flex;
