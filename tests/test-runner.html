@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Tetris — Test Runner</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        --pass: #1a7f37;
+        --fail: #cf222e;
+        --muted: #6e7781;
+        --border: #d0d7de;
+        --bg-fail: rgba(207, 34, 46, 0.08);
+      }
+      body {
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        margin: 0;
+        padding: 1.5rem;
+        line-height: 1.45;
+      }
+      h1 {
+        font-size: 1.1rem;
+        margin: 0 0 0.25rem;
+      }
+      #summary {
+        font-size: 1rem;
+        margin: 0 0 1rem;
+        padding: 0.5rem 0.75rem;
+        border: 1px solid var(--border);
+        border-radius: 6px;
+      }
+      #summary.pass { border-color: var(--pass); }
+      #summary.fail { border-color: var(--fail); }
+      .count-pass { color: var(--pass); font-weight: 700; }
+      .count-fail { color: var(--fail); font-weight: 700; }
+      .count-muted { color: var(--muted); }
+      ul#results {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+      }
+      #results li {
+        padding: 0.3rem 0.5rem;
+        border-bottom: 1px solid var(--border);
+        white-space: pre-wrap;
+        word-break: break-word;
+      }
+      #results li.fail { background: var(--bg-fail); }
+      .status { display: inline-block; width: 1.5rem; }
+      .ok .status { color: var(--pass); }
+      .fail .status { color: var(--fail); }
+      .name { font-weight: 600; }
+      .ms { color: var(--muted); font-weight: 400; margin-left: 0.5rem; }
+      .error {
+        display: block;
+        color: var(--fail);
+        margin-top: 0.25rem;
+        padding-left: 1.5rem;
+      }
+      .note {
+        color: var(--muted);
+        font-size: 0.85rem;
+        margin: 0.25rem 0 1rem;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Tetris — Test Runner</h1>
+    <p class="note">
+      Serve the project over a local static server (ES modules do not load from
+      <code>file://</code>), then open this page. Results print below and to the
+      browser console. No bundler, no npm.
+    </p>
+    <p id="summary">Loading test modules…</p>
+    <ul id="results"></ul>
+
+    <script type="module">
+      import { run, reset, count } from './harness.js';
+
+      // ----------------------------------------------------------------------
+      // Test module registry.
+      //
+      // Importing a `*.test.js` module runs it, which registers its cases with
+      // the shared harness. Add each new test file to this list as it is
+      // created. Paths are relative to this HTML file. Keeping an explicit list
+      // (rather than directory globbing, which static hosting cannot do without
+      // a build step) keeps the runner build-free and makes the suite's
+      // membership obvious.
+      //
+      // Expected files (created by later tasks):
+      //   './tetrominoes.test.js'
+      //   './board.test.js'
+      //   './scoring.test.js'
+      //   './game.test.js'
+      //   './input.test.js'
+      //   './renderer.test.js'
+      // ----------------------------------------------------------------------
+      const TEST_MODULES = [
+        './tetrominoes.test.js',
+        './board.test.js',
+        './scoring.test.js',
+        './assetLoader.test.js',
+        './input.test.js',
+        './game.test.js',
+        './renderer.test.js',
+      ];
+
+      const results = document.getElementById('results');
+      const summary = document.getElementById('summary');
+
+      function esc(text) {
+        return String(text)
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;');
+      }
+
+      function addCase(entry) {
+        const li = document.createElement('li');
+        li.className = entry.ok ? 'ok' : 'fail';
+        const status = entry.ok ? '✓' : '✗';
+        const ms = entry.ms.toFixed(1);
+        li.innerHTML =
+          `<span class="status">${status}</span>` +
+          `<span class="name">${esc(entry.name)}</span>` +
+          `<span class="ms">${ms}ms</span>`;
+        if (!entry.ok && entry.error) {
+          const err = document.createElement('span');
+          err.className = 'error';
+          err.textContent = (entry.error.stack || entry.error.message || String(entry.error));
+          li.appendChild(err);
+          console.error(`✗ ${entry.name}`, entry.error);
+        } else {
+          console.log(`✓ ${entry.name} (${ms}ms)`);
+        }
+        results.appendChild(li);
+      }
+
+      async function loadModules() {
+        const loadErrors = [];
+        for (const path of TEST_MODULES) {
+          try {
+            await import(path);
+          } catch (err) {
+            // Surface a module that failed to import as a visible failure
+            // instead of silently dropping its tests.
+            loadErrors.push({ path, err });
+            const li = document.createElement('li');
+            li.className = 'fail';
+            li.innerHTML =
+              `<span class="status">✗</span>` +
+              `<span class="name">failed to load ${esc(path)}</span>`;
+            const detail = document.createElement('span');
+            detail.className = 'error';
+            detail.textContent = (err && (err.stack || err.message)) || String(err);
+            li.appendChild(detail);
+            results.appendChild(li);
+            console.error(`✗ failed to load ${path}`, err);
+          }
+        }
+        return loadErrors;
+      }
+
+      async function main() {
+        reset();
+        const loadErrors = await loadModules();
+
+        if (count() === 0 && loadErrors.length === 0) {
+          summary.textContent =
+            'No test modules registered yet. Add files to TEST_MODULES in test-runner.html.';
+          summary.className = '';
+          console.warn('[test-runner] No test modules registered.');
+          return;
+        }
+
+        summary.textContent = 'Running…';
+        const result = await run(addCase);
+
+        const failedTotal = result.failed + loadErrors.length;
+        const ok = failedTotal === 0;
+        summary.className = ok ? 'pass' : 'fail';
+        summary.innerHTML =
+          `<span class="count-pass">${result.passed} passed</span>, ` +
+          `<span class="${failedTotal ? 'count-fail' : 'count-muted'}">${failedTotal} failed</span>, ` +
+          `<span class="count-muted">${result.total} total</span>` +
+          (loadErrors.length
+            ? ` <span class="count-fail">(${loadErrors.length} module load error${loadErrors.length === 1 ? '' : 's'})</span>`
+            : '');
+
+        const line =
+          `[test-runner] ${result.passed} passed, ${failedTotal} failed, ${result.total} total`;
+        if (ok) console.log(line);
+        else console.error(line);
+      }
+
+      main().catch((err) => {
+        summary.className = 'fail';
+        summary.textContent = `Test runner crashed: ${err && err.message ? err.message : err}`;
+        console.error('[test-runner] crashed', err);
+      });
+    </script>
+  </body>
+</html>

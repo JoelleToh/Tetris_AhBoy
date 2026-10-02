@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Tetris</title>
+    <link rel="stylesheet" href="css/styles.css" />
+  </head>
+  <body>
+    <!--
+      Bootstrap guard (Requirement 18.5): if the main ES module fails to load
+      or throws before it can signal success, reveal a visible error banner so
+      the failure is observable rather than leaving a blank, dead page.
+
+      How it works: this inline script arms a timeout and a global 'error'
+      listener. When js/main.js loads successfully it sets
+      window.__TETRIS_BOOTED__ = true (task 11.1), which clears the timeout.
+      If the flag is never set within the grace period, or a module/script
+      error fires, the banner is shown. Kept inline + dependency-free so it
+      still runs even when the module graph never loads.
+    -->
+    <div id="boot-error" role="alert" hidden>
+      Something went wrong loading the game. Check that the page is served over
+      HTTP(S) with its css/ and js/ files, then reload.
+    </div>
+    <script>
+      (function () {
+        var BANNER_ID = 'boot-error';
+        var shown = false;
+        function showBanner() {
+          if (shown) return;
+          shown = true;
+          var el = document.getElementById(BANNER_ID);
+          if (el) el.hidden = false;
+        }
+        // If the module never signals a successful boot, assume failure.
+        var timer = window.setTimeout(function () {
+          if (!window.__TETRIS_BOOTED__) showBanner();
+        }, 8000);
+        // Surface any load/parse error from the module (or its imports).
+        window.addEventListener(
+          'error',
+          function (event) {
+            var target = event && event.target;
+            // Script/resource load errors have a target with a src/href.
+            if (target && (target.src || target.href)) {
+              window.clearTimeout(timer);
+              showBanner();
+            }
+          },
+          true,
+        );
+        window.addEventListener('unhandledrejection', function () {
+          window.clearTimeout(timer);
+          showBanner();
+        });
+        // Expose a hook the module can call to confirm a healthy boot.
+        window.__tetrisBootOk = function () {
+          window.__TETRIS_BOOTED__ = true;
+          window.clearTimeout(timer);
+        };
+      })();
+    </script>
+
+    <main class="game">
+      <h1 class="game__title">Tetris</h1>
+
+      <!-- Asset-failure notice region (Requirements 18.5, 19.5). assetLoader.js
+           creates this dynamically if absent; providing it here keeps layout
+           stable. Hidden until a failure message is written into it. -->
+      <div id="asset-notice" role="alert" hidden></div>
+
+      <div class="game__layout">
+        <!-- The 10x20 playfield (Requirement 1.1). -->
+        <section class="playfield" aria-label="Playfield">
+          <canvas id="board" class="playfield__canvas" width="300" height="600">
+            Your browser does not support the canvas element.
+          </canvas>
+
+          <!-- Paused overlay — shown while status === 'paused' (Req 15.1). -->
+          <div id="paused-overlay" class="overlay" role="status" hidden>
+            <div class="overlay__content">
+              <p class="overlay__title">Paused</p>
+              <p class="overlay__hint">Press P to resume</p>
+            </div>
+          </div>
+
+          <!-- Game-over overlay — shown while status === 'gameover' (Req 14.2). -->
+          <div id="gameover-overlay" class="overlay" role="alert" hidden>
+            <div class="overlay__content">
+              <p class="overlay__title">Game Over</p>
+              <p class="overlay__hint">Press R to restart</p>
+            </div>
+          </div>
+        </section>
+
+        <aside class="sidebar" aria-label="Game information">
+          <!-- Next-piece preview (Requirements 16.1-16.3). -->
+          <section class="panel preview">
+            <h2 class="panel__heading">Next</h2>
+            <canvas id="preview" class="preview__canvas" width="120" height="120">
+              Your browser does not support the canvas element.
+            </canvas>
+          </section>
+
+          <!-- HUD: score, level, lines (Requirements 11.6, 12.2, 12.3). -->
+          <section class="panel hud">
+            <h2 class="panel__heading">Stats</h2>
+            <dl class="hud__list">
+              <div class="hud__row">
+                <dt class="hud__label">Score</dt>
+                <dd class="hud__value" id="score">0</dd>
+              </div>
+              <div class="hud__row">
+                <dt class="hud__label">Level</dt>
+                <dd class="hud__value" id="level">1</dd>
+              </div>
+              <div class="hud__row">
+                <dt class="hud__label">Lines</dt>
+                <dd class="hud__value" id="lines">0</dd>
+              </div>
+            </dl>
+          </section>
+
+          <!-- Controls help: each key -> action (Requirement 17.2). -->
+          <section class="panel controls" aria-label="Keyboard controls">
+            <h2 class="panel__heading">Controls</h2>
+            <dl class="controls__list">
+              <div class="controls__row">
+                <dt class="controls__keys">&#8592; / &#8594;</dt>
+                <dd class="controls__action">Move left / right</dd>
+              </div>
+              <div class="controls__row">
+                <dt class="controls__keys">&#8595;</dt>
+                <dd class="controls__action">Soft drop</dd>
+              </div>
+              <div class="controls__row">
+                <dt class="controls__keys">Space</dt>
+                <dd class="controls__action">Hard drop</dd>
+              </div>
+              <div class="controls__row">
+                <dt class="controls__keys">&#8593;</dt>
+                <dd class="controls__action">Rotate</dd>
+              </div>
+              <div class="controls__row">
+                <dt class="controls__keys">P</dt>
+                <dd class="controls__action">Pause / resume</dd>
+              </div>
+              <div class="controls__row">
+                <dt class="controls__keys">R</dt>
+                <dd class="controls__action">Restart</dd>
+              </div>
+            </dl>
+          </section>
+        </aside>
+      </div>
+
+      <!--
+        On-screen touch controls for mobile / no-keyboard play. Each button
+        carries a data-intent that main.js maps to the same intents as the
+        keyboard. Hidden on devices with a fine pointer (mouse) via CSS; shown
+        on touch / small screens. (Mobile play support.)
+      -->
+      <section class="touch" aria-label="Touch controls">
+        <div class="touch__dpad">
+          <button type="button" class="touch__btn touch__btn--left"
+                  data-intent="moveLeft" aria-label="Move left">&#8592;</button>
+          <button type="button" class="touch__btn touch__btn--rotate"
+                  data-intent="rotate" aria-label="Rotate">&#8635;</button>
+          <button type="button" class="touch__btn touch__btn--right"
+                  data-intent="moveRight" aria-label="Move right">&#8594;</button>
+          <button type="button" class="touch__btn touch__btn--down"
+                  data-intent="softDrop" aria-label="Soft drop">&#8595;</button>
+        </div>
+        <div class="touch__actions">
+          <button type="button" class="touch__btn touch__btn--drop"
+                  data-intent="hardDrop" aria-label="Hard drop">Drop</button>
+          <button type="button" class="touch__btn touch__btn--pause"
+                  data-intent="pauseToggle" aria-label="Pause or resume">Pause</button>
+          <button type="button" class="touch__btn touch__btn--restart"
+                  data-intent="restart" aria-label="Restart">Restart</button>
+        </div>
+      </section>
+    </main>
+
+    <script type="module" src="js/main.js"></script>
+  </body>
+</html>

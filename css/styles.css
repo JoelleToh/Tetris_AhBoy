@@ -1,0 +1,364 @@
+/* Tetris styles — responsive layout, HUD, and overlays (task 12.2).
+ *
+ * Goals (Requirements 17.4, 17.5):
+ *  - At any viewport width >= 320px the playfield, preview, HUD, controls help,
+ *    and overlays are fully visible with NO horizontal scrolling.
+ *  - The layout reflows fluidly on resize using responsive units, flexbox, and
+ *    a media query — no fixed pixel widths that could overflow a small screen.
+ *
+ * Element hooks (confirmed against renderer.js / assetLoader.js):
+ *   #score #level #lines   — HUD text
+ *   #paused-overlay        — shown while paused (toggled via [hidden])
+ *   #gameover-overlay      — shown on game over (toggled via [hidden])
+ *   #asset-notice          — visible Block_Image load-failure notice
+ * The board/preview canvases and the controls-help / HUD containers are styled
+ * by both their conventional ids (#board, #preview) and structural classes so
+ * the stylesheet stays robust regardless of how the markup is wired.
+ */
+
+/* --- Reset / base ------------------------------------------------------- */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  /* Prevent any accidental horizontal overflow at the document level. */
+  overflow-x: hidden;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  padding: clamp(0.5rem, 2vw, 1.5rem);
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial,
+    sans-serif;
+  color: #e8e8f0;
+  background: #0b0b12;
+  /* Center the game within the viewport. */
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+}
+
+/* Respect the hidden attribute used by the renderer to toggle overlays and
+ * the asset notice. Explicit so nothing accidentally re-displays them. */
+[hidden] {
+  display: none !important;
+}
+
+/* --- App shell ---------------------------------------------------------- */
+
+.game,
+#game {
+  width: 100%;
+  max-width: 48rem; /* comfortable desktop cap; shrinks freely below this */
+  display: flex;
+  flex-direction: column;
+  gap: clamp(0.5rem, 2vw, 1rem);
+}
+
+h1,
+.game-title {
+  margin: 0;
+  font-size: clamp(1.25rem, 4vw, 2rem);
+  text-align: center;
+  letter-spacing: 0.08em;
+}
+
+/* The main play area: board next to the side panel on wide screens, stacked
+ * on narrow ones. flex-wrap keeps everything inside the viewport at 320px. */
+.playarea,
+.layout {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: flex-start;
+  gap: clamp(0.5rem, 3vw, 1.25rem);
+}
+
+/* --- Playfield ---------------------------------------------------------- */
+
+/* The board wrapper constrains the canvas and preserves the 10:20 (1:2)
+ * aspect ratio while never exceeding the viewport width. */
+.board-wrap,
+.playfield {
+  position: relative; /* overlays position against this box */
+  flex: 1 1 220px;
+  width: 100%;
+  max-width: min(18rem, 50vh); /* keep the tall board visible on short screens */
+  aspect-ratio: 1 / 2;
+  background: #101018;
+  border: 2px solid #2a2a3a;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+/* The playfield canvas fills its wrapper and scales down on small screens. */
+.board-wrap canvas,
+#board,
+canvas.board {
+  display: block;
+  width: 100%;
+  height: 100%;
+  max-width: 100%;
+}
+
+/* --- Side panel: preview + HUD + controls ------------------------------ */
+
+.panel,
+.sidebar {
+  flex: 1 1 180px;
+  min-width: 0; /* allow the panel to shrink instead of forcing overflow */
+  max-width: 20rem;
+  display: flex;
+  flex-direction: column;
+  gap: clamp(0.5rem, 2vw, 1rem);
+}
+
+.preview-wrap,
+.preview {
+  width: 100%;
+  max-width: 8rem;
+  aspect-ratio: 1 / 1;
+  background: #101018;
+  border: 2px solid #2a2a3a;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.preview-wrap canvas,
+#preview,
+canvas.preview {
+  display: block;
+  width: 100%;
+  height: 100%;
+  max-width: 100%;
+}
+
+/* --- HUD (score / level / lines) --------------------------------------- */
+
+.hud {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
+}
+
+.hud > * {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.hud dt,
+.hud .label {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: #9a9ab0;
+}
+
+.hud dd,
+.hud .value,
+#score,
+#level,
+#lines {
+  margin: 0;
+  font-size: clamp(1rem, 3vw, 1.5rem);
+  font-variant-numeric: tabular-nums;
+  /* Long numbers wrap instead of pushing the layout wider. */
+  overflow-wrap: anywhere;
+}
+
+/* --- Controls help ------------------------------------------------------ */
+
+.controls-help,
+#controls-help {
+  font-size: 0.85rem;
+  line-height: 1.5;
+  color: #c8c8da;
+}
+
+.controls-help ul,
+#controls-help ul {
+  margin: 0.25rem 0 0;
+  padding-left: 1.1rem;
+}
+
+.controls-help kbd {
+  display: inline-block;
+  padding: 0 0.35em;
+  border: 1px solid #3a3a4e;
+  border-radius: 4px;
+  background: #1a1a26;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.85em;
+}
+
+/* --- Asset-failure notice ---------------------------------------------- */
+
+#asset-notice,
+.asset-notice {
+  padding: 0.5rem 0.75rem;
+  border: 1px solid #a33;
+  border-radius: 6px;
+  background: #2a1414;
+  color: #ffb3b3;
+  font-size: 0.85rem;
+  overflow-wrap: anywhere;
+}
+
+/* --- Overlays (paused / game over) ------------------------------------- */
+
+/* Centered overlays that cover the board when visible. Hidden entirely when
+ * the renderer sets the [hidden] attribute (handled by the rule above). */
+#paused-overlay,
+#gameover-overlay,
+.overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 1rem;
+  text-align: center;
+  background: rgba(8, 8, 16, 0.82);
+  color: #ffffff;
+  font-size: clamp(1rem, 4vw, 1.5rem);
+  z-index: 2;
+}
+
+#gameover-overlay {
+  background: rgba(32, 8, 8, 0.85);
+}
+
+.overlay h2,
+#paused-overlay > :first-child,
+#gameover-overlay > :first-child {
+  margin: 0;
+}
+
+/* --- Responsive breakpoint --------------------------------------------- */
+
+/* Below ~560px (covers 320px phones) keep the board and side panel SIDE BY
+ * SIDE instead of stacking: the layout stays a row, the board shrinks to a
+ * sensible share of the width, and the sidebar takes the rest. nowrap stops
+ * the panel from wrapping underneath the board. */
+@media (max-width: 560px) {
+  .game__layout,
+  .playarea,
+  .layout {
+    flex-direction: row;
+    flex-wrap: nowrap;
+    align-items: flex-start;
+    gap: clamp(0.4rem, 2vw, 0.75rem);
+  }
+
+  .playfield,
+  .board-wrap {
+    flex: 1 1 55%;
+    max-width: 55%;
+    /* Height-cap so the tall board stays fully visible on short screens. */
+    max-height: 80vh;
+  }
+
+  .sidebar,
+  .panel {
+    flex: 1 1 45%;
+    max-width: 45%;
+    min-width: 0;
+    font-size: 0.85rem;
+  }
+
+  .preview-wrap,
+  .preview {
+    max-width: 5.5rem;
+  }
+
+  /* Trim the controls-help text block on small screens; the on-screen touch
+   * buttons are the primary input there. */
+  .controls,
+  .controls-help,
+  #controls-help {
+    font-size: 0.75rem;
+  }
+}
+
+/* --- Touch controls ----------------------------------------------------- */
+
+/* On-screen buttons for mobile / no-keyboard play. Hidden by default; shown
+ * when the primary pointer is coarse (touch) or on narrow screens. */
+.touch {
+  display: none;
+  margin-top: clamp(0.5rem, 2vw, 1rem);
+  gap: clamp(0.5rem, 3vw, 1.25rem);
+  justify-content: center;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.touch__dpad {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  grid-template-areas:
+    ".    rot  ."
+    "left down right";
+  gap: 0.5rem;
+}
+
+.touch__btn--left { grid-area: left; }
+.touch__btn--right { grid-area: right; }
+.touch__btn--rotate { grid-area: rot; }
+.touch__btn--down { grid-area: down; }
+
+.touch__actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.touch__btn {
+  min-width: 3.25rem;
+  min-height: 3.25rem;
+  padding: 0.5rem 0.75rem;
+  font-size: 1.1rem;
+  color: #e8e8f0;
+  background: #1a1a26;
+  border: 1px solid #3a3a4e;
+  border-radius: 10px;
+  cursor: pointer;
+  /* Avoid the browser's double-tap-to-zoom / text selection on fast taps. */
+  touch-action: manipulation;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.touch__btn:active {
+  background: #2a2a3e;
+  transform: translateY(1px);
+}
+
+.touch__btn--drop,
+.touch__btn--pause,
+.touch__btn--restart {
+  min-width: 5rem;
+  font-size: 0.95rem;
+}
+
+/* Show the touch controls on touch-primary devices... */
+@media (pointer: coarse) {
+  .touch {
+    display: flex;
+  }
+}
+
+/* ...and as a fallback on narrow viewports regardless of pointer type. */
+@media (max-width: 560px) {
+  .touch {
+    display: flex;
+  }
+}
